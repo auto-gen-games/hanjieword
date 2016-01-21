@@ -2,9 +2,9 @@ import java.awt.{RenderingHints, Color, Font, Graphics2D}
 import java.awt.image.BufferedImage
 
 object HanjieWord extends App {
-  val text = "A"
+  val text = "KCL"
   val font = new Font ("Arial", Font.PLAIN, 10)
-  val image = {
+  val image: BufferedImage = {
     val graphicsContext = new BufferedImage (1, 1, BufferedImage.TYPE_INT_RGB).getGraphics.asInstanceOf[Graphics2D]
     graphicsContext.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF)
     graphicsContext.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
@@ -25,16 +25,17 @@ object HanjieWord extends App {
     sizedGraphics.dispose ()
     sizedImage
   }
-  val width = image.getWidth
-  val height = image.getHeight
-  val horizontal =
-    for (y <- image.getMinY until image.getMinY + height) yield
-      for (x <- image.getMinX until image.getMinX + width) yield
+  val uncompressedWidth = image.getWidth
+  val uncompressedHeight = image.getHeight
+  val uncompressedGrid: Seq[Seq[Boolean]] =
+    for (y <- image.getMinY until image.getMinY + uncompressedHeight) yield
+      for (x <- image.getMinX until image.getMinX + uncompressedWidth) yield
         image.getRGB (x, y) != -1
-  val vertical =
-    for (x <- image.getMinX until image.getMinX + width) yield
-      for (y <- image.getMinY until image.getMinY + height) yield
-        image.getRGB (x, y) != -1
+  val verticallyCompressed = uncompressedGrid.filter (_.contains (true))
+  val vertical = verticallyCompressed.transpose.filter (_.contains (true))
+  val horizontal = vertical.transpose
+  val width = vertical.size
+  val height = horizontal.size
   def lengths (pixels: Seq[Boolean]): Seq[Int] =
     if (pixels.isEmpty)
       Seq (0)
@@ -58,6 +59,12 @@ object HanjieWord extends App {
   println ()
   def rowAsString (row: Seq[Boolean]): String = row.map (b => if (b) "*" else ".").mkString
   def toString (matrix: Seq[Seq[Boolean]]): String = matrix.map (rowAsString).mkString ("\n")
+
+  println ("Original: ")
   println (toString (horizontal))
-  println (Solver.solve (width, height, rowLengths, columnLenths).isDefined)
+  println ()
+  println ("Solutions: ")
+  val solutions = Solver.solve (width, height, rowLengths, columnLenths)
+  println (Show.allToGrids (width, height, solutions))
+  println (solutions.size + " solutions")
 }

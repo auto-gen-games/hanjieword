@@ -33,7 +33,7 @@ object Solver {
   }
 
   /** Generate all the possibilities from each row and each column in the grid, given the grid's dimensions and the lengths. */
-  def findGridPossibilities (width: Int, allLengths: Seq[Seq[Int]], isRow: Boolean): Seq[Possibility] =
+  def allPossibilities (width: Int, allLengths: Seq[Seq[Int]], isRow: Boolean): Seq[Possibility] =
     allLengths.zipWithIndex.flatMap {
       case (lengths, index) => findRowPossibilities (index, isRow, lengths, width)
     }
@@ -46,39 +46,50 @@ object Solver {
       p => Entry (p._1._1, p._1._2, p._2.head)
     }.toSet
 
-  def filter (possibilities: Seq[Possibility], known: Set[Entry]): Seq[Possibility] =
+  /** Filters the row/column possibilities to those that do not contain cells contradicting the given entries, returning
+    * those remaining possibilities only if all rows/columns still have at least one possibility, else None. */
+  def filter (possibilities: Seq[Possibility], known: Set[Entry], height: Int, isRow: Boolean): Seq[Possibility] =
     possibilities.filter (!_.exists (entry => known.contains (entry.opposite)))
 
-  def entriesToGrid (width: Int, height: Int, entries: Set[Entry], rowOffset: Int, columnOffset: Int): Seq[Seq[Cell]] =
-    for (gRow <- 0 until height) yield
-      for (gCol <- 0 until width) yield
-        entries.find (e => e.row == gRow + rowOffset && e.column == gCol + columnOffset).map { e =>
-          if (e.filled) Filled else Empty
-        }.getOrElse (Unknown)
+  def feasible (width: Int, height: Int, rowPossibilities: Seq[Possibility], colPossibilities: Seq[Possibility]): Boolean =
+    (0 until height).forall (row => rowPossibilities.exists (_.head.row == row)) &&
+      (0 until width).forall (col => colPossibilities.exists (_.head.column == col))
 
-  def gridToString (grid: Seq[Seq[Cell]]) =
-    grid.map { _.map {
-      case Filled => "*"
-      case Empty => "."
-      case Unknown => "?"
-    }.mkString }.mkString ("\n")
+  def solve (width: Int, height: Int, rowLengths: Seq[Seq[Int]], columnLengths: Seq[Seq[Int]]): Seq[Set[Entry]] = {
+    /** All coordinates in the grid */
+    val points = Seq.tabulate (height, width)((_, _)).flatten
 
-  def solve (width: Int, height: Int, rowLengths: Seq[Seq[Int]], columnLengths: Seq[Seq[Int]]): Option[Set[Entry]] = {
-    def deduce (rowPossibilities: Seq[Possibility], colPossibilities: Seq[Possibility], previouslyKnown: Set[Entry]): Set[Entry] = {
-      val known = certainties (rowPossibilities) ++ certainties (colPossibilities)
-      println (gridToString (entriesToGrid (width, height, known, 0, 0))); println ()
-      if (known.size > previouslyKnown.size)
-        deduce (filter (rowPossibilities, known), filter (colPossibilities, known), known)
-      else
-        known
+    def search (rowAlternatives: Seq[Possibility], colAlternatives: Seq[Possibility], assumptions: Set[Entry]): Seq[Set[Entry]] = {
+      def deduce (rowPossibilities: Seq[Possibility], colPossibilities: Seq[Possibility], previouslyKnown: Set[Entry]): Option[Set[Entry]] = {
+        val rowsFiltered = filter (rowPossibilities, previouslyKnown, height, true)
+        val colsFiltered = filter (colPossibilities, previouslyKnown, width, false)
+        val known = certainties (rowsFiltered) ++ certainties (colsFiltered) ++ previouslyKnown
+        if (feasible (width, height, rowsFiltered, colsFiltered))
+          if (known.size > previouslyKnown.size)
+            deduce (rowsFiltered, colsFiltered, known)
+          else
+            Some (known)
+        else
+          None
+      }
+
+      deduce (rowAlternatives, colAlternatives, assumptions) match {
+        case Some (solution) =>
+          if (solution.size == width * height)
+            Seq (solution)
+          else {
+            points.find (point => !solution.exists (entry => entry.row == point._1 && entry.column == point._2)) match {
+              case Some (unknown) =>
+                search (rowAlternatives, colAlternatives, solution ++ assumptions + Entry (unknown._1, unknown._2, true)) ++
+                  search (rowAlternatives, colAlternatives, solution ++ assumptions + Entry (unknown._1, unknown._2, false))
+              case None =>
+                throw new Error ("Should never happen: solution of size " + solution.size + " with no unknown cells")
+            }
+          }
+        case None => Nil
+      }
     }
 
-    val rowPossibilities = findGridPossibilities (width, rowLengths, true)
-    val colPossibilities = findGridPossibilities (height, columnLengths, false)
-
-    val solution = deduce (rowPossibilities, colPossibilities, Set[Entry] ())
-    println (width + " " + height)
-    println (solution.size)
-    if (solution.size == width * height) Some (solution) else None
+    search (allPossibilities (width, rowLengths, true), allPossibilities (height, columnLengths, false), Set[Entry] ())
   }
 }
