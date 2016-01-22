@@ -1,3 +1,5 @@
+import scala.annotation.tailrec
+
 object Solver {
   /** A possibility is a sequence that is a possible pattern on a row/column. */
   type Possibility = Seq[Entry]
@@ -59,8 +61,11 @@ object Solver {
     /** All coordinates in the grid */
     val points = Seq.tabulate (height, width)((_, _)).flatten
 
-    def search (rowAlternatives: Seq[Possibility], colAlternatives: Seq[Possibility], assumptions: Set[Entry]): Seq[Set[Entry]] = {
+    @tailrec
+    def search (rowAlternatives: Seq[Possibility], colAlternatives: Seq[Possibility], assumptions: Seq[Set[Entry]], found: Seq[Set[Entry]]): Seq[Set[Entry]] = {
+      @tailrec
       def deduce (rowPossibilities: Seq[Possibility], colPossibilities: Seq[Possibility], previouslyKnown: Set[Entry]): Option[Set[Entry]] = {
+        print (".")
         val rowsFiltered = filter (rowPossibilities, previouslyKnown, height, true)
         val colsFiltered = filter (colPossibilities, previouslyKnown, width, false)
         val known = certainties (rowsFiltered) ++ certainties (colsFiltered) ++ previouslyKnown
@@ -73,23 +78,27 @@ object Solver {
           None
       }
 
-      deduce (rowAlternatives, colAlternatives, assumptions) match {
-        case Some (solution) =>
-          if (solution.size == width * height)
-            Seq (solution)
-          else {
-            points.find (point => !solution.exists (entry => entry.row == point._1 && entry.column == point._2)) match {
-              case Some (unknown) =>
-                search (rowAlternatives, colAlternatives, solution ++ assumptions + Entry (unknown._1, unknown._2, true)) ++
-                  search (rowAlternatives, colAlternatives, solution ++ assumptions + Entry (unknown._1, unknown._2, false))
-              case None =>
-                throw new Error ("Should never happen: solution of size " + solution.size + " with no unknown cells")
-            }
+      print ("+")
+      val solutions = assumptions.flatMap { assumption =>
+        deduce (rowAlternatives, colAlternatives, assumption).map { solution =>
+          (assumption, solution)
+        }
+      }
+      val isComplete = solutions.partition (_._2.size == width * height)
+
+      if (isComplete._2.isEmpty)
+        found ++ isComplete._1.map (_._2)
+      else {
+        val nextTries = isComplete._2.flatMap { partial =>
+          points.find (point => !partial._2.exists (entry => entry.row == point._1 && entry.column == point._2)).map { unknown =>
+            Seq (partial._1 ++ partial._2 + Entry (unknown._1, unknown._2, true),
+              partial._1 ++ partial._2 + Entry (unknown._1, unknown._2, false))
           }
-        case None => Nil
+        }.flatten
+        search (rowAlternatives, colAlternatives, nextTries, found ++ isComplete._1.map (_._2))
       }
     }
 
-    search (allPossibilities (width, rowLengths, true), allPossibilities (height, columnLengths, false), Set[Entry] ())
+    search (allPossibilities (width, rowLengths, true), allPossibilities (height, columnLengths, false), Seq (Set[Entry] ()), Nil)
   }
 }

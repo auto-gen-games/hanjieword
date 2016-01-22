@@ -1,9 +1,10 @@
 import java.awt.{RenderingHints, Color, Font, Graphics2D}
 import java.awt.image.BufferedImage
+import GridOps._
 
 object HanjieWord extends App {
-  val text = "KCL"
-  val font = new Font ("Arial", Font.PLAIN, 10)
+  val text = "TURING" // NOAH
+  val font = new Font ("Arial", Font.BOLD, 12)
   val image: BufferedImage = {
     val graphicsContext = new BufferedImage (1, 1, BufferedImage.TYPE_INT_RGB).getGraphics.asInstanceOf[Graphics2D]
     graphicsContext.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF)
@@ -25,17 +26,16 @@ object HanjieWord extends App {
     sizedGraphics.dispose ()
     sizedImage
   }
-  val uncompressedWidth = image.getWidth
-  val uncompressedHeight = image.getHeight
   val uncompressedGrid: Seq[Seq[Boolean]] =
-    for (y <- image.getMinY until image.getMinY + uncompressedHeight) yield
-      for (x <- image.getMinX until image.getMinX + uncompressedWidth) yield
+    for (y <- image.getMinY until image.getMinY + image.getHeight) yield
+      for (x <- image.getMinX until image.getMinX + image.getWidth) yield
         image.getRGB (x, y) != -1
-  val verticallyCompressed = uncompressedGrid.filter (_.contains (true))
-  val vertical = verticallyCompressed.transpose.filter (_.contains (true))
-  val horizontal = vertical.transpose
-  val width = vertical.size
-  val height = horizontal.size
+  val compressedGrid = uncompressedGrid.trimEdges
+
+  val horizontal = compressedGrid  //compressedGrid.surround (true)
+  val vertical = horizontal.transpose
+  val width = horizontal.width
+  val height = horizontal.height
   def lengths (pixels: Seq[Boolean]): Seq[Int] =
     if (pixels.isEmpty)
       Seq (0)
@@ -65,6 +65,7 @@ object HanjieWord extends App {
   println ()
   println ("Solutions: ")
   val solutions = Solver.solve (width, height, rowLengths, columnLenths)
+  println ()
   println (Show.allToGrids (width, height, solutions))
-  println (solutions.size + " solutions")
+  println (solutions.size + " solution(s)")
 }
