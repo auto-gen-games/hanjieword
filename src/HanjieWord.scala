@@ -3,7 +3,7 @@ import java.awt.image.BufferedImage
 import GridOps._
 
 object HanjieWord extends App {
-  val text = "TURING" // NOAH
+  val text = "SIMON MILES" // NOAH
   val font = new Font ("Arial", Font.BOLD, 12)
   val image: BufferedImage = {
     val graphicsContext = new BufferedImage (1, 1, BufferedImage.TYPE_INT_RGB).getGraphics.asInstanceOf[Graphics2D]
@@ -64,8 +64,12 @@ object HanjieWord extends App {
   println (toString (horizontal))
   println ()
   println ("Solutions: ")
-  val solutions = Solver.solve (width, height, rowLengths, columnLenths)
+  val start = System.currentTimeMillis
+  val solutions = Deducer.solve (rowLengths, columnLenths)
+  val period = System.currentTimeMillis - start
   println ()
-  println (Show.allToGrids (width, height, solutions))
+  println ()
+  println (Show.allToGrids (solutions))
   println (solutions.size + " solution(s)")
+  println ("Took: " + period + "ms")
 }

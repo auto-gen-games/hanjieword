@@ -57,15 +57,17 @@ object Solver {
     (0 until height).forall (row => rowPossibilities.exists (_.head.row == row)) &&
       (0 until width).forall (col => colPossibilities.exists (_.head.column == col))
 
-  def solve (width: Int, height: Int, rowLengths: Seq[Seq[Int]], columnLengths: Seq[Seq[Int]]): Seq[Set[Entry]] = {
+  def solve (rowLengths: Seq[Seq[Int]], columnLengths: Seq[Seq[Int]]): Seq[Set[Entry]] = {
+    val width = columnLengths.size
+    val height = rowLengths.size
     /** All coordinates in the grid */
     val points = Seq.tabulate (height, width)((_, _)).flatten
 
-    @tailrec
-    def search (rowAlternatives: Seq[Possibility], colAlternatives: Seq[Possibility], assumptions: Seq[Set[Entry]], found: Seq[Set[Entry]]): Seq[Set[Entry]] = {
-      @tailrec
-      def deduce (rowPossibilities: Seq[Possibility], colPossibilities: Seq[Possibility], previouslyKnown: Set[Entry]): Option[Set[Entry]] = {
-        print (".")
+    /** Find all solutions from a set of alternative rows and a set of alternative columns, given a set of assumed
+      * grid entries, and include a set of pre-found solutions in the results. */
+    @tailrec def search (rowAlternatives: Seq[Possibility], colAlternatives: Seq[Possibility],
+                assumptions: Seq[Set[Entry]], found: Seq[Set[Entry]]): Seq[Set[Entry]] = {
+      @tailrec def deduce (rowPossibilities: Seq[Possibility], colPossibilities: Seq[Possibility], previouslyKnown: Set[Entry]): Option[Set[Entry]] = {
         val rowsFiltered = filter (rowPossibilities, previouslyKnown, height, true)
         val colsFiltered = filter (colPossibilities, previouslyKnown, width, false)
         val known = certainties (rowsFiltered) ++ certainties (colsFiltered) ++ previouslyKnown
@@ -78,7 +80,6 @@ object Solver {
           None
       }
 
-      print ("+")
       val solutions = assumptions.flatMap { assumption =>
         deduce (rowAlternatives, colAlternatives, assumption).map { solution =>
           (assumption, solution)
